@@ -42,7 +42,12 @@ class DingTalkSender:
                 }
             }
             resp = requests.post(webhook, json=payload, timeout=10)
-            print(f"[OK] 钉钉通知已发送: {resp.json()}")
+            resp.raise_for_status()
+            result = resp.json()
+            if result.get("errcode") != 0:
+                print(f"[ERROR] 钉钉拒绝通知: {result}")
+                return False
+            print(f"[OK] 钉钉通知已发送: {result}")
             return True
         except Exception as e:
             print(f"[ERROR] 钉钉发送失败: {e}")

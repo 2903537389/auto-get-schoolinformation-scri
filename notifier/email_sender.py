@@ -30,8 +30,11 @@ class EmailSender:
 
             server = smtplib.SMTP_SSL(self.cfg["smtp_server"], self.cfg["smtp_port"])
             server.login(self.cfg["sender_email"], self.cfg["sender_password"])
-            server.send_message(msg)
+            refused = server.send_message(msg)
             server.quit()
+            if refused:
+                logger.error("[ERROR] %d 个收件人被拒收，保留待重试记录", len(refused))
+                return False
             logger.info(f"[OK] 邮件已发送，共 {len(notices)} 条通知")
             return True
         except Exception as e:
