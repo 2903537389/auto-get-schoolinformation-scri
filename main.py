@@ -12,8 +12,8 @@ from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import re
 from datetime import datetime, timedelta
-from notifier import EmailSender, DingTalkSender
-from storage import filter_new_notices
+from notifier import EmailSender
+from notifier.dispatcher import dispatch_notices
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 USER_DATA_DIR = os.path.join(os.path.expanduser("~"), "cdut-chrome-profile")
@@ -184,34 +184,16 @@ def main():
 
         context.close()
 
-    if not all_notices:
-        logger.info("无新通知。")
-        # 发送"暂无新通知"邮件
-        email_cfg = config.get("channels", {}).get("email", {})
-        if email_cfg.get("enabled"):
-            EmailSender(email_cfg).send_no_new()
-        return
-
-    # 去重
-    new_notices = filter_new_notices(all_notices)
-    logger.info(f"去重后: {len(new_notices)}条新通知")
-
-    if not new_notices:
-        logger.info("全部已推送过。")
-        email_cfg = config.get("channels", {}).get("email", {})
-        if email_cfg.get("enabled"):
-            EmailSender(email_cfg).send_no_new()
-        return
-
-    # 推送
     channels = config.get("channels", {})
-    email_cfg = channels.get("email", {})
-    if email_cfg.get("enabled"):
-        EmailSender(email_cfg).send(new_notices)
-
-    dt_cfg = channels.get("dingtalk", {})
-    if dt_cfg.get("enabled"):
-        DingTalkSender(dt_cfg).send(new_notices)
+    # 本次没有抓到新通知时，也要处理之前未成功送达的通知。
+    results = dispatch_notices(all_notices, channels)
+    if not results:
+        logger.info("无待推送通知。")
+        email_cfg = channels.get("email", {})
+        if email_cfg.get("enabled"):
+            EmailSender(email_cfg).send_no_new()
+    elif not all(results.values()):
+        logger.warning("有渠道推送失败，待发送记录已保留。")
 
     logger.info("完成！")
 

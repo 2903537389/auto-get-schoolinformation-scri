@@ -2,3 +2,4 @@ playwright>=1.40
 beautifulsoup4>=4.12
 lxml>=4.9
 PyYAML>=6.0
+requests>=2.31
